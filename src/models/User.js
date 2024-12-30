@@ -16,6 +16,11 @@ module.exports = (sequelize, DataTypes) => {
       username: DataTypes.STRING,
       password_hash: DataTypes.STRING,
       email: DataTypes.STRING,
+      admin: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false, // Define false como padrão para usuários não admins
+      },
     },
     {
       sequelize,

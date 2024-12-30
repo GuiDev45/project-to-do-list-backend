@@ -144,15 +144,32 @@ exports.updateUser = async (req, res) => {
       return res.status(404).json({ message: "Usuário não encontrado" });
     }
 
+    // Verificar se o usuário autenticado é o mesmo ou se é um admin
+    if (req.user.userId !== parseInt(id) && !req.user.admin) {
+      return res
+        .status(403)
+        .json({ message: "Acesso proibido. Permissão insuficiente." });
+    }
+
     let hashedPassword = user.password_hash;
+
+    // Verificar se o usuário quer atualizar a senha
     if (password) {
       hashedPassword = await bcrypt.hash(password, 10);
     }
 
+    // Verificar se o usuário comum está tentando alterar o e-mail
+    if (!req.user.admin && email) {
+      return res.status(403).json({
+        message: "Acesso proibido. Usuários comuns não podem alterar o e-mail.",
+      });
+    }
+
+    // Atualiza o usuário com os novos dados, mas não permite alterar o e-mail para usuários comuns
     await user.update({
       username: username || user.username,
       password_hash: hashedPassword,
-      email: email || user.email,
+      email: email && req.user.admin ? email : user.email, // Só permite alterar o e-mail para admins
     });
 
     return res

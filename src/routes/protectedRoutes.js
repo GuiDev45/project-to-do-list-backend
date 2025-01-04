@@ -4,6 +4,7 @@ const {
   getUserById,
   updateUser,
   deleteUser,
+  logoutUser,
 } = require("../controllers/usersController");
 const authenticateJWT = require("../middlewares/authenticateJWT");
 
@@ -19,7 +20,7 @@ const isAdmin = (req, res, next) => {
   next();
 };
 
-// Rota protegida para acessar o perfil do usuário logado (deve vir antes da rota :id)
+// Rota protegida para acessar o perfil do usuário logado
 router.get("/profile", authenticateJWT, (req, res) => {
   res.json({
     message: "Bem-vindo ao perfil do usuário!",
@@ -32,13 +33,16 @@ router.get("/profile", authenticateJWT, (req, res) => {
 // Rota protegida para obter todos os usuários (apenas para administradores)
 router.get("/", authenticateJWT, isAdmin, getAllUsers);
 
-// Rota protegida para obter um usuário por ID (usuário comum só pode acessar seu próprio perfil)
+// Rota protegida para obter um usuário por ID
 router.get("/:id", authenticateJWT, getUserById);
 
-// Rota protegida para atualizar um usuário (usuário comum só pode atualizar seu próprio perfil)
+// Rota protegida para atualizar um usuário
 router.put("/:id", authenticateJWT, updateUser);
 
-// Rota protegida para deletar um usuário (apenas administradores podem deletar usuários)
+// Rota protegida para deletar um usuário
 router.delete("/:id", authenticateJWT, isAdmin, deleteUser);
+
+// Rota para logout (atualizar o token para invalidar)
+router.post("/logout", authenticateJWT, logoutUser);
 
 module.exports = router;

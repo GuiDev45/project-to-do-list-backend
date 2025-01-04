@@ -21,12 +21,17 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: false, // Define false como padrão para usuários não admins
       },
+      last_token_expired_at: {
+        type: DataTypes.DATE,
+        allowNull: true, // Pode ser nulo inicialmente
+      },
     },
     {
       sequelize,
-      modelName: "User", // Nome do modelo em PascalCase
-      tableName: "users", // Nome da tabela em snake_case
+      modelName: "User",
+      tableName: "users",
     },
   );
+
   return users;
 };

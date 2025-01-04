@@ -1,4 +1,4 @@
-const { User, Token } = require("../models"); // Importando os modelos User e Token
+const { User } = require("../models"); // Importando os modelos User
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
@@ -10,7 +10,6 @@ exports.createUser = async (req, res) => {
   try {
     const { username, password, email } = req.body;
 
-    // Verificar se o e-mail já existe
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
       return res.status(400).json({ message: "Email já cadastrado!" });
@@ -18,12 +17,11 @@ exports.createUser = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Criar usuário com admin como falso por padrão
     const newUser = await User.create({
       username,
       password_hash: hashedPassword,
       email,
-      admin: false, // Apenas admins criados manualmente
+      admin: false,
     });
 
     return res
@@ -42,32 +40,22 @@ exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Verificando se o usuário existe
     const user = await User.findOne({ where: { email } });
     if (!user) {
       return res.status(400).json({ message: "Email ou senha inválidos" });
     }
 
-    // Verificando se a senha está correta
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
     if (!isPasswordValid) {
       return res.status(400).json({ message: "Email ou senha inválidos" });
     }
 
-    // Gerando o token JWT
+    // Geração do token com expiração de 1 hora
     const token = jwt.sign(
-      { userId: user.id, username: user.username, admin: user.admin }, // Incluindo 'admin' aqui
-      process.env.JWT_SECRET,
-      { expiresIn: "1h" }, // O token expira em 1 hora
+      { userId: user.id, username: user.username, admin: user.admin },
+      JWT_SECRET,
+      { expiresIn: "1h" }, // Expira em 1 hora
     );
-
-    // Salvando o token na tabela tokens
-    const expiresAt = new Date(Date.now() + 3600 * 1000); // Expira em 1 hora
-    await Token.create({
-      user_id: user.id,
-      token,
-      expires_at: expiresAt,
-    });
 
     return res.status(200).json({ message: "Login bem-sucedido!", token });
   } catch (error) {
@@ -78,7 +66,59 @@ exports.loginUser = async (req, res) => {
   }
 };
 
-// Obter todos os usuários
+// Logout de um usuário (atualiza last_token_expired_at)
+exports.logoutUser = async (req, res) => {
+  try {
+    const { userId } = req.user; // ID do usuário autenticado (do token)
+
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+
+    // Atualizando o campo `last_token_expired_at`
+    await user.update({ last_token_expired_at: new Date() });
+
+    return res.status(200).json({ message: "Logout realizado com sucesso!" });
+  } catch (error) {
+    console.error(error);
+    return res
+      .status(500)
+      .json({ message: "Erro ao realizar logout", error: error.message });
+  }
+};
+
+// Middleware para validar token e last_token_expired_at
+exports.validateToken = async (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({ message: "Token não fornecido" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    const user = await User.findByPk(decoded.userId);
+    if (!user) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+
+    if (
+      user.last_token_expired_at &&
+      new Date(decoded.iat * 1000) < user.last_token_expired_at
+    ) {
+      return res.status(401).json({ message: "Token expirado ou revogado" });
+    }
+
+    req.user = decoded;
+    next();
+  } catch (error) {
+    console.error(error);
+    return res.status(401).json({ message: "Token inválido" });
+  }
+};
+
+// Obter todos os usuários (incluindo last_token_expired_at opcionalmente)
 exports.getAllUsers = async (req, res) => {
   try {
     if (!req.user.admin) {
@@ -88,7 +128,7 @@ exports.getAllUsers = async (req, res) => {
     }
 
     const users = await User.findAll({
-      attributes: ["id", "username", "email", "admin"], // Filtrando campos para retorno
+      attributes: ["id", "username", "email", "admin", "last_token_expired_at"],
     });
 
     return res.status(200).json({ users });
@@ -103,23 +143,18 @@ exports.getAllUsers = async (req, res) => {
 // Obter um usuário por ID
 exports.getUserById = async (req, res) => {
   try {
-    // Desestruturando o id da URL
     const { id } = req.params;
 
-    // Verificando se o id é um número válido
-    if (isNaN(parseInt(id))) {
-      return res.status(400).json({ message: `ID inválido: ${id}.` });
-    }
-
-    // Verificando se o usuário autenticado é o mesmo ou se é um admin
     if (req.user.userId !== parseInt(id) && !req.user.admin) {
       return res
         .status(403)
         .json({ message: "Acesso proibido. Permissão insuficiente." });
     }
 
-    // Buscando o usuário no banco
-    const user = await User.findByPk(id);
+    const user = await User.findByPk(id, {
+      attributes: ["id", "username", "email", "admin", "last_token_expired_at"],
+    });
+
     if (!user) {
       return res.status(404).json({ message: "Usuário não encontrado" });
     }
@@ -192,9 +227,6 @@ exports.deleteUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "Usuário não encontrado" });
     }
-
-    // Remover os tokens associados ao usuário
-    await Token.destroy({ where: { user_id: user.id } });
 
     await user.destroy();
     return res.status(200).json({ message: "Usuário deletado com sucesso!" });

@@ -15,6 +15,8 @@ module.exports = {
           username: "john_doe",
           password_hash: hashedPassword1,
           email: "john.doe@example.com",
+          admin: false, // Definindo 'admin' como false (não administrador)
+          last_token_expired_at: null, // Nenhuma data de expiração do token
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -22,6 +24,8 @@ module.exports = {
           username: "jane_smith",
           password_hash: hashedPassword2,
           email: "jane.smith@example.com",
+          admin: true, // Definindo 'admin' como true (administrador)
+          last_token_expired_at: null, // Nenhuma data de expiração do token
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -29,6 +33,8 @@ module.exports = {
           username: "bob_jones",
           password_hash: hashedPassword3,
           email: "bob.jones@example.com",
+          admin: false, // Definindo 'admin' como false (não administrador)
+          last_token_expired_at: null, // Nenhuma data de expiração do token
           createdAt: new Date(),
           updatedAt: new Date(),
         },
